@@ -145,3 +145,14 @@ Observations:
 - mrand48_r is ~2x slower than hardware
 - File input performance depends on system's urandom implementation
 - Piped output adds about 25% overhead
+
+submission:
+ran these 2:
+expand Makefile notes.txt *.c *.h | awk '/\r/ || 100 < length'
+awk '/\r/' <test-llm.txt
+
+they both output nothing
+then ran:
+make clean
+make
+make check
