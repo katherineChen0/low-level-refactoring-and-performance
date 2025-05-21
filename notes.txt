@@ -1,0 +1,18 @@
+Setup
+1. extracted randall-git.tgz which contained an existing Git repo
+2. initialized a new GitHub repo 
+3. copied local repo to Github
+4. verfied files appear on GitHub
+
+reviewed existing code:
+- randall.c is monolithic program generating random bytes
+- makefile builds the program and can create tarballs
+- current Makefile lacks test functionality
+
+expanded Makefile's check to include:
+- output length verification
+- randomness check- clear pass/fail reporting for each test case
+- auto cleanup of test artifacts
+
+verified test functionality:
+- confirmed test pass w working implementation

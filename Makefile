@@ -33,6 +33,16 @@ default: randall
 randall: randall.c
 	$(CC) $(CFLAGS) $@.c -o $@
 
+#test target to verify program func
+check: randall
+	@echo "Running tests..."
+	@echo -n "Test 1: output length verification..."
+	@./randall 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 2: Different output for different runs..."
+	@./randall 100 > output1 && ./randall 100 > output2 && \
+	cmp -s output1 output2 && echo "FAIL (outputs identical)" || echo "PASS"
+	@rm -f output1 output2@echo "All tests completed"
+
 assignment: randall-assignment.$(TAREXT)
 assignment-files = COPYING Makefile randall.c
 randall-assignment.$(TAREXT): $(assignment-files)
