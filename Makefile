@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 # Optimization level.  Change this -O2 to -Og or -O0 or whatever.
-OPTIMIZE =
+OPTIMIZE = -O2
 
 # The C compiler and its options.
 CC = gcc
@@ -28,12 +28,23 @@ TAR = tar
 TARFLAGS = --gzip --transform 's,^,randall/,'
 TAREXT = tgz
 
+# Source files
+SRCS = randall.c options.c output.c rand64-hw.c rand64-sw.c
+OBJS = $(SRCS:.c=.o)
+HEADERS = options.h output.h rand64-hw.h rand64-sw.h
+
 default: randall
 
-randall: randall.c
-	$(CC) $(CFLAGS) $@.c -o $@
+randall: $(OBJS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
-#test target to verify program func
+randall.o: randall.c $(HEADERS)
+options.o: options.c options.h
+output.o: output.c output.h options.h
+rand64-hw.o: rand64-hw.c rand64-hw.h
+rand64-sw.o: rand64-sw.c rand64-sw.h
+
+# test target to verify program functionality
 check: randall
 	@echo "Running tests..."
 	@echo -n "Test 1: output length verification..."
@@ -41,23 +52,28 @@ check: randall
 	@echo -n "Test 2: Different output for different runs..."
 	@./randall 100 > output1 && ./randall 100 > output2 && \
 	cmp -s output1 output2 && echo "FAIL (outputs identical)" || echo "PASS"
-	@rm -f output1 output2@echo "All tests completed"
+	@echo -n "Test 3: mrand48_r input method..."
+	@./randall -i mrand48_r 100 > output3 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 4: block output method..."
+	@./randall -o 64 100 > output4 && echo "PASS" || (echo "FAIL"; exit 1)
+	@rm -f output1 output2 output3 output4
+	@echo "All tests completed"
 
 assignment: randall-assignment.$(TAREXT)
-assignment-files = COPYING Makefile randall.c
+assignment-files = COPYING Makefile $(SRCS) $(HEADERS)
 randall-assignment.$(TAREXT): $(assignment-files)
 	$(TAR) $(TARFLAGS) -cf $@ $(assignment-files)
 
 submission-tarball: randall-submission.$(TAREXT)
 submission-files = $(assignment-files) \
-  notes.txt # More files should be listed here, as needed.
+  notes.txt README.md # More files should be listed here, as needed.
 randall-submission.$(TAREXT): $(submission-files)
 	$(TAR) $(TARFLAGS) -cf $@ $(submission-files)
 
 repository-tarball:
 	$(TAR) -czf randall-git.tgz .git
 
-.PHONY: default clean assignment submission-tarball repository-tarball
+.PHONY: default clean check assignment submission-tarball repository-tarball
 
 clean:
-	rm -f *.o *.$(TAREXT) randall
+	rm -f *.o *.$(TAREXT) randall output*

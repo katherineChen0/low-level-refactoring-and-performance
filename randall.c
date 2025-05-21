@@ -1,206 +1,77 @@
-/* Generate N bytes of random output.  */
-
-/* When generating output this program uses the x86-64 RDRAND
-   instruction if available to generate random numbers, falling back
-   on /dev/random and stdio otherwise.
-
-   This program is not portable.  Compile it with gcc -mrdrnd for a
-   x86-64 machine.
-
-   Copyright 2015, 2017, 2020 Paul Eggert
-
-   This program is free software: you can redistribute it and/or
-   modify it under the terms of the GNU General Public License as
-   published by the Free Software Foundation, either version 3 of the
-   License, or (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful, but
-   WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-
-#include <cpuid.h>
-#include <errno.h>
-#include <immintrin.h>
-#include <limits.h>
-#include <stdbool.h>
+#include "options.h"
+#include "output.h"
+#include "rand64-hw.h"
+#include "rand64-sw.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <errno.h>
+#include <string.h>
 
-/* Hardware implementation.  */
-
-/* Description of the current CPU.  */
-struct cpuid { unsigned eax, ebx, ecx, edx; };
-
-/* Return information about the CPU.  See <http://wiki.osdev.org/CPUID>.  */
-static struct cpuid
-cpuid (unsigned int leaf, unsigned int subleaf)
-{
-  struct cpuid result;
-  asm ("cpuid"
-       : "=a" (result.eax), "=b" (result.ebx),
-	 "=c" (result.ecx), "=d" (result.edx)
-       : "a" (leaf), "c" (subleaf));
-  return result;
-}
-
-/* Return true if the CPU supports the RDRAND instruction.  */
-static _Bool
-rdrand_supported (void)
-{
-  struct cpuid extended = cpuid (1, 0);
-  return (extended.ecx & bit_RDRND) != 0;
-}
-
-/* Initialize the hardware rand64 implementation.  */
-static void
-hardware_rand64_init (void)
-{
-}
-
-/* Return a random value, using hardware operations.  */
-static unsigned long long
-hardware_rand64 (void)
-{
-  unsigned long long int x;
-
-  /* Work around GCC bug 107565
-     <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=107565>.  */
-  x = 0;
-
-  while (! _rdrand64_step (&x))
-    continue;
-  return x;
-}
-
-/* Finalize the hardware rand64 implementation.  */
-static void
-hardware_rand64_fini (void)
-{
-}
-
-
-
-/* Software implementation.  */
-
-/* Input stream containing random bytes.  */
-static FILE *urandstream;
-
-/* Initialize the software rand64 implementation.  */
-static void
-software_rand64_init (void)
-{
-  urandstream = fopen ("/dev/random", "r");
-  if (! urandstream)
-    abort ();
-}
-
-/* Return a random value, using software operations.  */
-static unsigned long long
-software_rand64 (void)
-{
-  unsigned long long int x;
-  if (fread (&x, sizeof x, 1, urandstream) != 1)
-    abort ();
-  return x;
-}
-
-/* Finalize the software rand64 implementation.  */
-static void
-software_rand64_fini (void)
-{
-  fclose (urandstream);
-}
-
-static bool
-writebytes (unsigned long long x, int nbytes)
-{
-  do
-    {
-      if (putchar (x) < 0)
-	return false;
-      x >>= CHAR_BIT;
-      nbytes--;
-    }
-  while (0 < nbytes);
-
-  return true;
-}
-
-/* Main program, which outputs N bytes of random data.  */
-int
-main (int argc, char **argv)
-{
-  /* Check arguments.  */
-  bool valid = false;
-  long long nbytes;
-  if (argc == 2)
-    {
-      char *endptr;
-      errno = 0;
-      nbytes = strtoll (argv[1], &endptr, 10);
-      if (errno)
-	perror (argv[1]);
-      else
-	valid = !*endptr && 0 <= nbytes;
-    }
-  if (!valid)
-    {
-      fprintf (stderr, "%s: usage: %s NBYTES\n", argv[0], argv[0]);
-      return 1;
+int main(int argc, char **argv) {
+    struct options opts;
+    if (!parse_options(argc, argv, &opts)) {
+        return 1;
     }
 
-  /* If there's no work to do, don't worry about which library to use.  */
-  if (nbytes == 0)
-    return 0;
-
-  /* Now that we know we have work to do, arrange to use the
-     appropriate library.  */
-  void (*initialize) (void);
-  unsigned long long (*rand64) (void);
-  void (*finalize) (void);
-  if (rdrand_supported ())
-    {
-      initialize = hardware_rand64_init;
-      rand64 = hardware_rand64;
-      finalize = hardware_rand64_fini;
-    }
-  else
-    {
-      initialize = software_rand64_init;
-      rand64 = software_rand64;
-      finalize = software_rand64_fini;
+    if (opts.nbytes == 0) {
+        return 0;
     }
 
-  initialize ();
-  int wordsize = sizeof rand64 ();
-  int output_errno = 0;
+    // Initialize random number generator
+    void (*rand_init)(void) = NULL;
+    unsigned long long (*rand64)(void) = NULL;
+    void (*rand_fini)(void) = NULL;
 
-  do
-    {
-      unsigned long long x = rand64 ();
-      int outbytes = nbytes < wordsize ? nbytes : wordsize;
-      if (!writebytes (x, outbytes))
-	{
-	  output_errno = errno;
-	  break;
-	}
-      nbytes -= outbytes;
-    }
-  while (0 < nbytes);
-
-  if (fclose (stdout) != 0)
-    output_errno = errno;
-
-  if (output_errno)
-    {
-      errno = output_errno;
-      perror ("output");
+    if (strcmp(opts.input_method, "rdrand") == 0) {
+        if (!rdrand_supported()) {
+            fprintf(stderr, "Error: RDRAND instruction not supported on this processor\n");
+            return 1;
+        }
+        rand_init = hardware_rand64_init;
+        rand64 = hardware_rand64;
+        rand_fini = hardware_rand64_fini;
+    } else {
+        rand_init = (void (*)(void))software_rand64_init;
+        rand64 = software_rand64;
+        rand_fini = software_rand64_fini;
+        software_rand64_init(opts.input_method);
     }
 
-  finalize ();
-  return !!output_errno;
+    if (!initialize_output(&opts)) {
+        return 1;
+    }
+
+    int wordsize = sizeof(unsigned long long);
+    int output_errno = 0;
+    long long remaining = opts.nbytes;
+
+    rand_init();
+    while (remaining > 0) {
+        unsigned long long x = rand64();
+        int outbytes = remaining < wordsize ? remaining : wordsize;
+        if (!write_bytes(x, outbytes)) {
+            output_errno = errno;
+            break;
+        }
+        remaining -= outbytes;
+    }
+
+    if (!flush_remaining_bytes()) {
+        output_errno = errno;
+    }
+
+    if (fclose(stdout) != 0) {
+        output_errno = errno;
+    }
+
+    if (output_errno) {
+        errno = output_errno;
+        perror("output");
+    }
+
+    rand_fini();
+    finalize_output();
+
+    return !!output_errno;
 }
