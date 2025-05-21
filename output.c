@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
 
 static char *output_buffer = NULL;
 static size_t buffer_size = 0;

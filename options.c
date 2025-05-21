@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <errno.h>
+#include <stdbool.h>
 
 bool parse_options(int argc, char **argv, struct options *opts) {
     // Set defaults

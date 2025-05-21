@@ -1,6 +1,8 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
 
+#include <stdbool.h>
+
 struct options {
     const char *input_method;
     const char *output_method;
