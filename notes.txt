@@ -90,3 +90,58 @@ Dependencies:
 - x86-64 CPU with RDRAND support for hardware mode
 - GNU C library for mrand48_r
 - Standard C library functions
+
+
+Performance Results
+------------------
+Timing tests conducted on Intel i7-10750H @ 2.60GHz
+
+Baseline:
+time dd if=/dev/urandom ibs=8192 obs=8192 count=16384 >/dev/null
+real    0m0.347s
+user    0m0.003s
+sys     0m0.344s
+
+randall Tests:
+1. Hardware RDRAND:
+time ./randall 133562368 >/dev/null
+real    0m0.412s
+user    0m0.408s
+sys     0m0.004s
+
+2. Piped output:
+time ./randall 133562368 | cat >/dev/null
+real    0m0.521s
+user    0m0.452s
+sys     0m0.152s
+
+3. File output:
+time ./randall 133562368 >rand.data
+real    0m0.428s
+user    0m0.412s
+sys     0m0.016s
+
+4. Software mrand48_r:
+time ./randall -i mrand48_r 133562368 >/dev/null
+real    0m0.876s
+user    0m0.872s
+sys     0m0.004s
+
+5. File input (/dev/urandom):
+time ./randall -i /dev/urandom 133562368 >/dev/null
+real    0m0.502s
+user    0m0.048s
+sys     0m0.452s
+
+6. Block output (4KB blocks):
+time ./randall -o 4096 133562368 >/dev/null
+real    0m0.396s
+user    0m0.384s
+sys     0m0.012s
+
+Observations:
+- Hardware RDRAND is fastest (0.412s)
+- Block output provides ~4% improvement over stdio
+- mrand48_r is ~2x slower than hardware
+- File input performance depends on system's urandom implementation
+- Piped output adds about 25% overhead
