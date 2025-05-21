@@ -16,3 +16,77 @@ expanded Makefile's check to include:
 
 verified test functionality:
 - confirmed test pass w working implementation
+
+project structure
+1. randall.c - main program that orchestrates the random number generation
+2. options.[ch] - Handles command-line argument parsing
+3. output.[ch] - Manages output methods (stdio and block writes)
+4. rand64-hw.[ch] - Hardware RDRAND implementation
+5. rand64-sw.[ch] - Software implementations (mrand48 and file input)
+
+Implementation Details
+----------------------
+
+Command Line Options:
+- -i <input> : Specifies input source:
+  * rdrand (default) - Hardware RNG using RDRAND
+  * mrand48_r - GNU C library's mrand48
+  * /path/to/file - Read from specified file
+- -o <output> : Specifies output method:
+  * stdio (default) - Standard I/O
+  * N - Block writes of N bytes using write()
+- NBYTES : Number of random bytes to generate
+
+Key Features Implemented:
+1. Input Methods:
+   - Hardware RDRAND with proper CPU feature detection
+   - Software mrand48_r implementation
+   - File-based random data source (/dev/random by default)
+
+2. Output Methods:
+   - Standard I/O (putchar)
+   - Block writes using write() system call
+   - Handles partial writes correctly
+
+3. Error Handling:
+   - Comprehensive error checking for:
+     * File operations
+     * System calls
+     * Memory allocation
+     * Invalid user input
+   - Clean resource deallocation
+
+4. Testing:
+   - Added test cases in Makefile:
+     * Output length verification
+     * Randomness verification
+     * Input method testing
+     * Block output testing
+
+Performance Considerations:
+- Block writes significantly improve performance for large outputs
+- Hardware RDRAND is fastest when available
+- mrand48_r provides good performance for software RNG
+- File I/O has higher overhead but works universally
+
+Build Instructions:
+1. make - Builds the randall executable
+2. make check - Runs test cases
+3. make clean - Removes build artifacts
+
+Usage Examples:
+1. ./randall 1000 - Default (rdrand + stdio)
+2. ./randall -i mrand48_r -o 1024 1M - Software RNG with 1KB blocks
+3. ./randall -i /dev/urandom 1G - File input with large output
+
+Known Issues:
+- None currently - all test cases pass
+- Potential future improvements:
+  * Additional RNG algorithms
+  * More output methods
+  * Better performance metrics
+
+Dependencies:
+- x86-64 CPU with RDRAND support for hardware mode
+- GNU C library for mrand48_r
+- Standard C library functions
