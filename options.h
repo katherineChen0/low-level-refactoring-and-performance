@@ -1,15 +1,26 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
 
-#include <stdbool.h>
-
-struct options {
-    const char *input_method;
-    const char *output_method;
-    long long output_block_size;
-    long long nbytes;
+enum input_type {
+    INPUT_RDRAND,
+    INPUT_MRAND48_R,
+    INPUT_FILE
 };
 
-bool parse_options(int argc, char **argv, struct options *opts);
+enum output_type {
+    OUTPUT_STDIO,
+    OUTPUT_BLOCK
+};
+
+struct randall_options {
+    long long nbytes;
+    enum input_type input;
+    char *input_file;
+    enum output_type output;
+    int block_size;
+};
+
+/* Parse command line options and return 0 on success, -1 on error */
+int parse_options(int argc, char **argv, struct randall_options *opts);
 
 #endif

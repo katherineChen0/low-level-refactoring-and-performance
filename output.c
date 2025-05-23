@@ -1,85 +1,77 @@
-#include "output.h"
-#include "options.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <limits.h>
 #include <string.h>
+#include <errno.h>
+#include "output.h"
 
-static char *output_buffer = NULL;
-static size_t buffer_size = 0;
-static size_t buffer_pos = 0;
-static FILE *output_file = NULL;
-static int output_fd = STDOUT_FILENO;
-static int should_close_output = 0;
+static enum output_type output_mode;
+static int block_size;
+static char *output_buffer;
+static int buffer_pos;
 
-bool initialize_output(const struct options *opts) {
-    if (strcmp(opts->output_method, "block") == 0) {
-        buffer_size = opts->output_block_size;
-        output_buffer = malloc(buffer_size);
+int init_output(struct randall_options *opts)
+{
+    output_mode = opts->output;
+    block_size = opts->block_size;
+    output_buffer = NULL;
+    buffer_pos = 0;
+
+    if (output_mode == OUTPUT_BLOCK) {
+        output_buffer = malloc(block_size);
         if (!output_buffer) {
-            perror("malloc");
-            return false;
+            fprintf(stderr, "randall: failed to allocate output buffer\n");
+            return -1;
         }
-        output_file = stdout;
-        output_fd = STDOUT_FILENO;
-        should_close_output = 0;
-    } else if (strcmp(opts->output_method, "stdio") == 0) {
-        output_file = stdout;
-        output_fd = STDOUT_FILENO;
-        should_close_output = 0;
-    } else {
-        // Future: handle file output here
-        output_file = stdout;
-        output_fd = STDOUT_FILENO;
-        should_close_output = 0;
     }
-    return true;
+
+    return 0;
 }
 
-bool write_bytes(unsigned long long x, int nbytes) {
-    if (output_buffer) {
-        // Buffered output mode
-        for (int i = 0; i < nbytes; i++) {
-            output_buffer[buffer_pos++] = x & 0xFF;
-            x >>= CHAR_BIT;
-            if (buffer_pos >= buffer_size) {
-                ssize_t bytes_written = write(output_fd, output_buffer, buffer_size);
-                if (bytes_written < 0) {
-                    perror("write");
-                    return false;
+int write_bytes(const char *buf, int nbytes)
+{
+    if (output_mode == OUTPUT_STDIO) {
+        /* Use stdio output */
+        return fwrite(buf, 1, nbytes, stdout) == nbytes ? nbytes : -1;
+    } else {
+        /* Use block output with write() system call */
+        int bytes_written = 0;
+        
+        while (bytes_written < nbytes) {
+            int bytes_to_copy = nbytes - bytes_written;
+            int space_left = block_size - buffer_pos;
+            
+            if (bytes_to_copy > space_left) {
+                bytes_to_copy = space_left;
+            }
+            
+            memcpy(output_buffer + buffer_pos, buf + bytes_written, bytes_to_copy);
+            buffer_pos += bytes_to_copy;
+            bytes_written += bytes_to_copy;
+            
+            /* Flush buffer if full */
+            if (buffer_pos == block_size) {
+                ssize_t written = write(STDOUT_FILENO, output_buffer, block_size);
+                if (written < 0) {
+                    return -1;
                 }
+                /* Note: we don't consider partial writes as errors per assignment */
                 buffer_pos = 0;
             }
         }
-    } else {
-        // Stdio mode
-        for (int i = 0; i < nbytes; i++) {
-            if (fputc(x & 0xFF, output_file) == EOF)
-                return false;
-            x >>= CHAR_BIT;
-        }
+        
+        return nbytes;
     }
-    return true;
 }
 
-bool flush_remaining_bytes(void) {
-    if (output_buffer && buffer_pos > 0) {
-        ssize_t bytes_written = write(output_fd, output_buffer, buffer_pos);
-        if (bytes_written < 0) {
-            perror("write");
-            return false;
+void finalize_output(void)
+{
+    if (output_mode == OUTPUT_BLOCK && output_buffer) {
+        /* Flush any remaining data in buffer */
+        if (buffer_pos > 0) {
+            write(STDOUT_FILENO, output_buffer, buffer_pos);
         }
-    }
-    return true;
-}
-
-void finalize_output(void) {
-    if (output_buffer) {
         free(output_buffer);
         output_buffer = NULL;
-    }
-    if (should_close_output && output_file && output_file != stdout) {
-        fclose(output_file);
     }
 }

@@ -1,7 +1,28 @@
-# Files that Git should ignore
-
-*.data
+# Object files
 *.o
-*.tgz
-*~
+
+# Executables  
 randall
+
+# Generated data files
+rand.data
+*.data
+
+# Tarballs
+*.tgz
+*.tar.gz
+
+# Backup files
+*~
+*.bak
+
+# Core dumps
+core
+core.*
+
+# Valgrind output
+vgcore.*
+
+# Editor temporary files
+.*.swp
+.*.swo

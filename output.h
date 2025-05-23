@@ -1,12 +1,15 @@
 #ifndef OUTPUT_H
 #define OUTPUT_H
 
-#include <stdbool.h>
 #include "options.h"
 
-bool initialize_output(const struct options *opts);
-bool write_bytes(unsigned long long x, int nbytes);
+/* Initialize output subsystem */
+int init_output(struct randall_options *opts);
+
+/* Write bytes to output */
+int write_bytes(const char *buf, int nbytes);
+
+/* Finalize output subsystem */
 void finalize_output(void);
-bool flush_remaining_bytes(void);
 
 #endif

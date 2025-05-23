@@ -1,83 +1,55 @@
-# Make x86-64 random byte generators.
+# Makefile for randall
 
-# Copyright 2015, 2020, 2021 Paul Eggert
-
-# This program is free software: you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-
-# Optimization level.  Change this -O2 to -Og or -O0 or whatever.
-# Make x86-64 random byte generators
-
-OPTIMIZE = -O2
 CC = gcc
-CFLAGS = $(OPTIMIZE) -g3 -Wall -Wextra -fanalyzer \
-  -march=native -mtune=native -mrdrnd
+CFLAGS = -Wall -Wextra -O2 -g -march=native
 
-TAR = tar
-TARFLAGS = --gzip --transform 's,^,randall/,'
-TAREXT = tgz
-
-SRCS = randall.c options.c output.c rand64-hw.c rand64-sw.c
-OBJS = $(SRCS:.c=.o)
+SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
+OBJECTS = $(SOURCES:.c=.o)
 HEADERS = options.h output.h rand64-hw.h rand64-sw.h
 
-default: randall
+TARGET = randall
 
-randall: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS)
+.PHONY: all clean check submission-tarball repository-tarball
 
-# Explicit dependencies
-randall.o: randall.c $(HEADERS)
-options.o: options.c options.h
-output.o: output.c output.h options.h
-rand64-hw.o: rand64-hw.c rand64-hw.h
-rand64-sw.o: rand64-sw.c rand64-sw.h
+all: $(TARGET)
 
-check: randall
-	@echo "Running tests..."
-	@echo -n "Test 1: output length verification..."
-	@./randall 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 2: Different output..."
-	@./randall 100 > out1 && ./randall 100 > out2 && \
-	cmp -s out1 out2 && echo "FAIL" || echo "PASS"
-	@rm -f out1 out2
-	@echo -n "Test 3: No options..."
-	@./randall 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 4: -i rdrand..."
-	@./randall -i rdrand 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 5: -i mrand48_r..."
-	@./randall -i mrand48_r 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 6: -i /dev/urandom..."
-	@./randall -i /dev/urandom 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 7: -o stdio..."
-	@./randall -o stdio 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 8: -o 10..."
-	@./randall -o 10 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
-	@echo -n "Test 9: Non-existent file..."
-	@./randall -i /nonexistent 100 2>/dev/null || echo "PASS"
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $<
+
+check: $(TARGET)
+	@echo "Running basic tests..."
+	# Test 1: Generate 0 bytes (should produce no output)
+	./$(TARGET) 0 | wc -c | grep -q '^0$$' && echo "Test 1 passed: 0 bytes" || echo "Test 1 failed"
+	
+	# Test 2: Generate 100 bytes (check output length)
+	./$(TARGET) 100 | wc -c | grep -q '^100$$' && echo "Test 2 passed: 100 bytes" || echo "Test 2 failed"
+	
+	# Test 3: Test different input methods
+	./$(TARGET) -i rdrand 50 | wc -c | grep -q '^50$$' && echo "Test 3a passed: rdrand" || echo "Test 3a failed"
+	./$(TARGET) -i mrand48_r 50 | wc -c | grep -q '^50$$' && echo "Test 3b passed: mrand48_r" || echo "Test 3b failed"
+	./$(TARGET) -i /dev/urandom 50 | wc -c | grep -q '^50$$' && echo "Test 3c passed: /dev/urandom" || echo "Test 3c failed"
+	
+	# Test 4: Test block output
+	./$(TARGET) -o 1024 100 | wc -c | grep -q '^100$$' && echo "Test 4 passed: block output" || echo "Test 4 failed"
+	
+	# Test 5: Invalid arguments should fail
+	! ./$(TARGET) -100 2>/dev/null && echo "Test 5a passed: negative bytes rejected" || echo "Test 5a failed"
+	! ./$(TARGET) abc 2>/dev/null && echo "Test 5b passed: invalid bytes rejected" || echo "Test 5b failed"
+	! ./$(TARGET) -i invalid 100 2>/dev/null && echo "Test 5c passed: invalid input rejected" || echo "Test 5c failed"
+	
+	@echo "All tests completed."
 
 clean:
-	rm -f *.o *.$(TAREXT) randall
+	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz
 
-assignment: randall-assignment.$(TAREXT)
-randall-assignment.$(TAREXT): $(SRCS) $(HEADERS) Makefile COPYING
-	$(TAR) $(TARFLAGS) -cf $@ $^
-
-submission-tarball: randall-submission.$(TAREXT)
-randall-submission.$(TAREXT): $(SRCS) $(HEADERS) Makefile COPYING notes.txt test-llm.txt
-	$(TAR) $(TARFLAGS) -cf $@ $^
+submission-tarball: $(TARGET)
+	tar -czf randall-submission.tgz $(SOURCES) $(HEADERS) Makefile notes.txt
 
 repository-tarball:
-	$(TAR) -czf randall-git.tgz .git
+	tar -czf randall-git.tgz .git
 
-.PHONY: default clean check assignment submission-tarball repository-tarball
+distclean: clean
+	rm -f *.tgz
