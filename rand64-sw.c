@@ -1,16 +1,20 @@
 #include "rand64-sw.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> 
+#include <string.h>
 #include <errno.h>
+#include <stdint.h>
+#include <time.h>
+#include <unistd.h>
 
 static FILE *urandstream = NULL;
 static char *random_source = NULL;
+static struct drand48_data drand_buf;
 
 void software_rand64_init(const char *source) {
     if (strcmp(source, "mrand48_r") == 0) {
-        // mrand48_r will be handled in software_rand64()
         random_source = strdup(source);
+        srand48_r((long)(time(NULL) ^ getpid()), &drand_buf);
     } else {
         // File-based random source
         urandstream = fopen(source, "r");
@@ -23,7 +27,10 @@ void software_rand64_init(const char *source) {
 
 unsigned long long software_rand64(void) {
     if (random_source && strcmp(random_source, "mrand48_r") == 0) {
-        return mrand48();
+        long int r1, r2;
+        mrand48_r(&drand_buf, &r1);
+        mrand48_r(&drand_buf, &r2);
+        return ((unsigned long long)(uint32_t)r1 << 32) | (uint32_t)r2;
     } else {
         unsigned long long x;
         if (fread(&x, sizeof x, 1, urandstream) != 1) {

@@ -9,7 +9,9 @@
 static char *output_buffer = NULL;
 static size_t buffer_size = 0;
 static size_t buffer_pos = 0;
+static FILE *output_file = NULL;
 static int output_fd = STDOUT_FILENO;
+static int should_close_output = 0;
 
 bool initialize_output(const struct options *opts) {
     if (strcmp(opts->output_method, "block") == 0) {
@@ -19,6 +21,18 @@ bool initialize_output(const struct options *opts) {
             perror("malloc");
             return false;
         }
+        output_file = stdout;
+        output_fd = STDOUT_FILENO;
+        should_close_output = 0;
+    } else if (strcmp(opts->output_method, "stdio") == 0) {
+        output_file = stdout;
+        output_fd = STDOUT_FILENO;
+        should_close_output = 0;
+    } else {
+        // Future: handle file output here
+        output_file = stdout;
+        output_fd = STDOUT_FILENO;
+        should_close_output = 0;
     }
     return true;
 }
@@ -29,7 +43,6 @@ bool write_bytes(unsigned long long x, int nbytes) {
         for (int i = 0; i < nbytes; i++) {
             output_buffer[buffer_pos++] = x & 0xFF;
             x >>= CHAR_BIT;
-            
             if (buffer_pos >= buffer_size) {
                 ssize_t bytes_written = write(output_fd, output_buffer, buffer_size);
                 if (bytes_written < 0) {
@@ -41,12 +54,11 @@ bool write_bytes(unsigned long long x, int nbytes) {
         }
     } else {
         // Stdio mode
-        do {
-            if (putchar(x) < 0)
+        for (int i = 0; i < nbytes; i++) {
+            if (fputc(x & 0xFF, output_file) == EOF)
                 return false;
             x >>= CHAR_BIT;
-            nbytes--;
-        } while (0 < nbytes);
+        }
     }
     return true;
 }
@@ -66,5 +78,8 @@ void finalize_output(void) {
     if (output_buffer) {
         free(output_buffer);
         output_buffer = NULL;
+    }
+    if (should_close_output && output_file && output_file != stdout) {
+        fclose(output_file);
     }
 }

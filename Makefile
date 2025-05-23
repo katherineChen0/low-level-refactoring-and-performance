@@ -51,6 +51,20 @@ check: randall
 	@./randall 100 > out1 && ./randall 100 > out2 && \
 	cmp -s out1 out2 && echo "FAIL" || echo "PASS"
 	@rm -f out1 out2
+	@echo -n "Test 3: No options..."
+	@./randall 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 4: -i rdrand..."
+	@./randall -i rdrand 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 5: -i mrand48_r..."
+	@./randall -i mrand48_r 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 6: -i /dev/urandom..."
+	@./randall -i /dev/urandom 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 7: -o stdio..."
+	@./randall -o stdio 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 8: -o 10..."
+	@./randall -o 10 100 | wc -c | grep -q 100 && echo "PASS" || (echo "FAIL"; exit 1)
+	@echo -n "Test 9: Non-existent file..."
+	@./randall -i /nonexistent 100 2>/dev/null || echo "PASS"
 
 clean:
 	rm -f *.o *.$(TAREXT) randall

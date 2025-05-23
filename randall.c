@@ -61,10 +61,6 @@ int main(int argc, char **argv) {
         output_errno = errno;
     }
 
-    if (fclose(stdout) != 0) {
-        output_errno = errno;
-    }
-
     if (output_errno) {
         errno = output_errno;
         perror("output");
