@@ -53,7 +53,7 @@ check: randall
 	@rm -f out1 out2
 
 clean:
-	rm -f *.o *.$(TAREXT) randall output*
+	rm -f *.o *.$(TAREXT) randall
 
 assignment: randall-assignment.$(TAREXT)
 randall-assignment.$(TAREXT): $(SRCS) $(HEADERS) Makefile COPYING
