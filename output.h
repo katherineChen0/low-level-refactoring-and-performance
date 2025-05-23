@@ -2,6 +2,7 @@
 #define OUTPUT_H
 
 #include <stdbool.h>
+#include "options.h"
 
 bool initialize_output(const struct options *opts);
 bool write_bytes(unsigned long long x, int nbytes);
