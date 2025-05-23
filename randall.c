@@ -1,73 +1,86 @@
+/* Generate random bytes. */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
 #include "options.h"
 #include "output.h"
 #include "rand64-hw.h"
 #include "rand64-sw.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <string.h>
 
-int main(int argc, char **argv) {
-    struct options opts;
-    if (!parse_options(argc, argv, &opts)) {
+int main(int argc, char **argv)
+{
+    /* Parse options */
+    struct randall_options opts;
+    if (parse_options(argc, argv, &opts) != 0) {
         return 1;
     }
 
-    if (opts.nbytes == 0) {
-        return 0;
+    /* Check for valid nbytes */
+    if (opts.nbytes < 0) {
+        fprintf(stderr, "randall: invalid number of bytes: %lld\n", opts.nbytes);
+        return 1;
     }
 
-    // Initialize random number generator
-    void (*rand_init)(void) = NULL;
+    /* Initialize random number generator */
+    void (*finalize_rand)(void) = NULL;
     unsigned long long (*rand64)(void) = NULL;
-    void (*rand_fini)(void) = NULL;
 
-    if (strcmp(opts.input_method, "rdrand") == 0) {
-        if (!rdrand_supported()) {
-            fprintf(stderr, "Error: RDRAND instruction not supported on this processor\n");
+    switch (opts.input) {
+        case INPUT_RDRAND:
+            if (!rdrand_supported()) {
+                fprintf(stderr, "randall: rdrand not supported\n");
+                return 1;
+            }
+            rand64 = hardware_rand64;
+            finalize_rand = hardware_rand64_fini;
+            break;
+        case INPUT_MRAND48_R:
+            if (software_rand64_init() != 0) {
+                fprintf(stderr, "randall: failed to initialize mrand48_r\n");
+                return 1;
+            }
+            rand64 = software_rand64;
+            finalize_rand = software_rand64_fini;
+            break;
+        case INPUT_FILE:
+            if (file_rand64_init(opts.input_file) != 0) {
+                fprintf(stderr, "randall: failed to open input file: %s\n", opts.input_file);
+                return 1;
+            }
+            rand64 = file_rand64;
+            finalize_rand = file_rand64_fini;
+            break;
+    }
+
+    /* Initialize output */
+    if (init_output(&opts) != 0) {
+        if (finalize_rand) finalize_rand();
+        return 1;
+    }
+
+    /* Generate and output random bytes */
+    long long bytes_written = 0;
+    while (bytes_written < opts.nbytes) {
+        unsigned long long x = rand64();
+        int outbytes = opts.nbytes - bytes_written;
+        if (outbytes > sizeof(x))
+            outbytes = sizeof(x);
+
+        if (write_bytes((char *)&x, outbytes) != outbytes) {
+            fprintf(stderr, "randall: output error\n");
+            if (finalize_rand) finalize_rand();
+            finalize_output();
             return 1;
         }
-        rand_init = hardware_rand64_init;
-        rand64 = hardware_rand64;
-        rand_fini = hardware_rand64_fini;
-    } else {
-        rand_init = (void (*)(void))software_rand64_init;
-        rand64 = software_rand64;
-        rand_fini = software_rand64_fini;
-        software_rand64_init(opts.input_method);
+        bytes_written += outbytes;
     }
 
-    if (!initialize_output(&opts)) {
-        return 1;
-    }
-
-    int wordsize = sizeof(unsigned long long);
-    int output_errno = 0;
-    long long remaining = opts.nbytes;
-
-    rand_init();
-    while (remaining > 0) {
-        unsigned long long x = rand64();
-        int outbytes = remaining < wordsize ? remaining : wordsize;
-        if (!write_bytes(x, outbytes)) {
-            output_errno = errno;
-            break;
-        }
-        remaining -= outbytes;
-    }
-
-    if (!flush_remaining_bytes()) {
-        output_errno = errno;
-    }
-
-    if (output_errno) {
-        errno = output_errno;
-        perror("output");
-    }
-
-    rand_fini();
+    /* Clean up */
+    if (finalize_rand) finalize_rand();
     finalize_output();
 
-    return !!output_errno;
+    return 0;
 }
