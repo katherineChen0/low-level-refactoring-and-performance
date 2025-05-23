@@ -22,23 +22,59 @@ $(TARGET): $(OBJECTS)
 check: $(TARGET)
 	@echo "Running basic tests..."
 	# Test 1: Generate 0 bytes (should produce no output)
-	./$(TARGET) 0 | wc -c | grep -q '^0$$' && echo "Test 1 passed: 0 bytes" || echo "Test 1 failed"
+	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$'; then \
+		echo "Test 1 passed: 0 bytes"; \
+	else \
+		echo "Test 1 failed: 0 bytes"; \
+	fi
 	
 	# Test 2: Generate 100 bytes (check output length)
-	./$(TARGET) 100 | wc -c | grep -q '^100$$' && echo "Test 2 passed: 100 bytes" || echo "Test 2 failed"
+	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+		echo "Test 2 passed: 100 bytes"; \
+	else \
+		echo "Test 2 failed: 100 bytes"; \
+	fi
 	
 	# Test 3: Test different input methods
-	./$(TARGET) -i rdrand 50 | wc -c | grep -q '^50$$' && echo "Test 3a passed: rdrand" || echo "Test 3a failed"
-	./$(TARGET) -i mrand48_r 50 | wc -c | grep -q '^50$$' && echo "Test 3b passed: mrand48_r" || echo "Test 3b failed"
-	./$(TARGET) -i /dev/urandom 50 | wc -c | grep -q '^50$$' && echo "Test 3c passed: /dev/urandom" || echo "Test 3c failed"
+	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3a passed: rdrand"; \
+	else \
+		echo "Test 3a failed: rdrand"; \
+	fi
+	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3b passed: mrand48_r"; \
+	else \
+		echo "Test 3b failed: mrand48_r"; \
+	fi
+	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3c passed: /dev/urandom"; \
+	else \
+		echo "Test 3c failed: /dev/urandom"; \
+	fi
 	
 	# Test 4: Test block output
-	./$(TARGET) -o 1024 100 | wc -c | grep -q '^100$$' && echo "Test 4 passed: block output" || echo "Test 4 failed"
+	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+		echo "Test 4 passed: block output"; \
+	else \
+		echo "Test 4 failed: block output"; \
+	fi
 	
 	# Test 5: Invalid arguments should fail
-	! ./$(TARGET) -100 2>/dev/null && echo "Test 5a passed: negative bytes rejected" || echo "Test 5a failed"
-	! ./$(TARGET) abc 2>/dev/null && echo "Test 5b passed: invalid bytes rejected" || echo "Test 5b failed"
-	! ./$(TARGET) -i invalid 100 2>/dev/null && echo "Test 5c passed: invalid input rejected" || echo "Test 5c failed"
+	@if ! ./$(TARGET) -100 2>/dev/null; then \
+		echo "Test 5a passed: negative bytes rejected"; \
+	else \
+		echo "Test 5a failed: negative bytes not rejected"; \
+	fi
+	@if ! ./$(TARGET) abc 2>/dev/null; then \
+		echo "Test 5b passed: invalid bytes rejected"; \
+	else \
+		echo "Test 5b failed: invalid bytes not rejected"; \
+	fi
+	@if ! ./$(TARGET) -i invalid 100 2>/dev/null; then \
+		echo "Test 5c passed: invalid input rejected"; \
+	else \
+		echo "Test 5c failed: invalid input not rejected"; \
+	fi
 	
 	@echo "All tests completed."
 
@@ -46,7 +82,12 @@ clean:
 	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz
 
 submission-tarball: $(TARGET)
-	tar -czf randall-submission.tgz $(SOURCES) $(HEADERS) Makefile notes.txt
+	mkdir -p randall
+	cp $(SOURCES) $(HEADERS) Makefile notes.txt randall/
+	chmod +x test-basic.sh 2>/dev/null || true
+	cp test-basic.sh randall/ 2>/dev/null || true
+	tar -czf randall-submission.tgz randall/
+	rm -rf randall
 
 repository-tarball:
 	tar -czf randall-git.tgz .git

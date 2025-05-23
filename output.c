@@ -52,11 +52,15 @@ int write_bytes(const char *buf, int nbytes)
             
             /* Flush buffer if full */
             if (buffer_pos == block_size) {
-                ssize_t written = write(STDOUT_FILENO, output_buffer, block_size);
-                if (written < 0) {
-                    return -1;
+                ssize_t total_written = 0;
+                while (total_written < block_size) {
+                    ssize_t written = write(STDOUT_FILENO, output_buffer + total_written, 
+                                          block_size - total_written);
+                    if (written < 0) {
+                        return -1;
+                    }
+                    total_written += written;
                 }
-                /* Note: we don't consider partial writes as errors per assignment */
                 buffer_pos = 0;
             }
         }
@@ -70,7 +74,15 @@ void finalize_output(void)
     if (output_mode == OUTPUT_BLOCK && output_buffer) {
         /* Flush any remaining data in buffer */
         if (buffer_pos > 0) {
-            write(STDOUT_FILENO, output_buffer, buffer_pos);
+            ssize_t total_written = 0;
+            while (total_written < buffer_pos) {
+                ssize_t written = write(STDOUT_FILENO, output_buffer + total_written,
+                                      buffer_pos - total_written);
+                if (written < 0) {
+                    break; /* Don't report errors during cleanup */
+                }
+                total_written += written;
+            }
         }
         free(output_buffer);
         output_buffer = NULL;
