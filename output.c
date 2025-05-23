@@ -32,7 +32,8 @@ int write_bytes(const char *buf, int nbytes)
 {
     if (output_mode == OUTPUT_STDIO) {
         /* Use stdio output */
-        return fwrite(buf, 1, nbytes, stdout) == nbytes ? nbytes : -1;
+        size_t written = fwrite(buf, 1, nbytes, stdout);
+        return written == (size_t)nbytes ? nbytes : -1;
     } else {
         /* Use block output with write() system call */
         int bytes_written = 0;
