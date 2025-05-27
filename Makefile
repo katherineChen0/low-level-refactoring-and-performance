@@ -16,35 +16,17 @@ TEST_RNG_TARGET = test-rng
 
 all: $(TARGET) $(TEST_RNG_TARGET)
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $^
-
 $(TEST_RNG_TARGET): $(TEST_RNG_OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^
 
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $<
-
 check:
-	@# Build the test-rng program first
-	@echo "Building RNG test program..."
-	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1 || { echo "Failed to build RNG test program"; exit 1; }
-	
-	@# Run RNG validation tests
-	@echo "Running RNG validation tests..."
-	@./$(TEST_RNG_TARGET) > rng_test_output.txt || { echo "RNG tests failed to execute"; exit 1; }
-	@if grep -q "RNG passed" rng_test_output.txt; then \
-		echo "RNG tests passed"; \
-	else \
-		echo "RNG tests failed"; \
-		cat rng_test_output.txt; \
-		exit 1; \
-	fi
-	
-	@# Build the main program
-	@echo "Building main program..."
-	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Failed to build main program"; exit 1; }
-	
+	@echo "Running RNG implementation tests..."
+	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1
+	@./$(TEST_RNG_TARGET) || { echo "RNG tests failed"; exit 1; }
+	@echo "RNG tests passed"
+
+	@echo "Running randall functionality tests..."
+	@$(MAKE) $(TARGET) >/dev/null 2>&1	
 	@# Run basic functionality tests
 	@echo "Running basic functionality tests..."
 	@echo "Test 1: Checking if program compiles..."

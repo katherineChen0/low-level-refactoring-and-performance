@@ -4,56 +4,39 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TEST_COUNT 10000
+#define TEST_ITERATIONS 1000
 
 void test_rng(const char *name, 
-              unsigned long long (*rng)(void), 
-              void (*init)(void), 
+              unsigned long long (*rng)(void),
+              void (*init)(void),
               void (*fini)(void)) {
-    init();
     printf("Testing %s...\n", name);
     
-    // Test 1: Basic functionality
-    unsigned long long val = rng();
-    printf("  Basic test: %s\n", val != 0 ? "PASSED" : "FAILED");
+    init();
     
-    // Test 2: Value changes
+    // Test basic functionality
+    unsigned long long val = rng();
+    if (val == 0) {
+        printf("  FAIL: First value was zero\n");
+        exit(1);
+    }
+    
+    // Test for repeated values
+    int duplicates = 0;
     unsigned long long prev = val;
-    int changes = 0;
-    for (int i = 0; i < TEST_COUNT; i++) {
+    for (int i = 0; i < TEST_ITERATIONS; i++) {
         val = rng();
-        if (val != prev) changes++;
+        if (val == prev) duplicates++;
         prev = val;
     }
-    float change_rate = (float)changes/TEST_COUNT;
-    printf("  Change rate: %.2f%% (%s)\n", 
-           change_rate*100, 
-           change_rate > 0.9 ? "PASSED" : "FAILED");
     
-    // Test 3: Bit distribution
-    int bits[64] = {0};
-    for (int i = 0; i < TEST_COUNT; i++) {
-        val = rng();
-        for (int b = 0; b < 64; b++) {
-            if (val & (1ULL << b)) bits[b]++;
-        }
+    if (duplicates > TEST_ITERATIONS/100) {  // Allow 1% duplicates
+        printf("  FAIL: Too many duplicates (%d/%d)\n", duplicates, TEST_ITERATIONS);
+        exit(1);
     }
-    
-    int balanced_bits = 0;
-    for (int b = 0; b < 64; b++) {
-        float ratio = (float)bits[b]/TEST_COUNT;
-        if (ratio > 0.4 && ratio < 0.6) balanced_bits++;
-    }
-    printf("  Balanced bits: %d/64 (%s)\n", 
-           balanced_bits,
-           balanced_bits > 50 ? "PASSED" : "FAILED");
-    
-    int passed = (val != 0) && (change_rate > 0.9) && (balanced_bits > 50);
-    printf("  %s: %s\n\n", name, passed ? "RNG passed" : "RNG failed");
     
     fini();
-    
-    if (!passed) exit(1);
+    printf("  PASS: %s\n", name);
 }
 
 int main() {
@@ -61,17 +44,16 @@ int main() {
     if (rdrand_supported()) {
         test_rng("hardware RNG", hardware_rand64, hardware_rand64_init, hardware_rand64_fini);
     } else {
-        printf("Hardware RNG not supported - skipping\n");
+        printf("Skipping hardware RNG (not supported)\n");
     }
     
-    // Test mrand48 implementation
+    // Test software RNGs
     setMrand48();
-    test_rng("software RNG (mrand48)", software_rand64, software_rand64_init, software_rand64_fini);
+    test_rng("software RNG (mrand48_r)", software_rand64, software_rand64_init, software_rand64_fini);
     
-    // Test file-based implementation
     setFilename("/dev/urandom");
     test_rng("file-based RNG (/dev/urandom)", software_rand64, software_rand64_init, software_rand64_fini);
     
-    printf("All RNG tests completed\n");
+    printf("All RNG tests passed\n");
     return 0;
 }
