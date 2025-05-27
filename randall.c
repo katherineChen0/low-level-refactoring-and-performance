@@ -41,14 +41,7 @@ main (int argc, char **argv)
       fprintf(stderr, "rdrand hardware random number generator currently not available!\n");
       return 1;
     }
-  }
-  else if (inputChoice == 1) { // mrand_48
-    initialize = software_rand48_init;
-    rand64 = software_rand48;
-    finalize = software_rand48_fini;
-    // printf("mrand48 set\n");
-  }
-  else if (inputChoice == 2) { // file
+  }else if (inputChoice == 2) { // file
     initialize = software_rand64_init;
     rand64 = software_rand64;
     finalize = software_rand64_fini;
