@@ -16,19 +16,21 @@ TEST_RNG_TARGET = test-rng
 
 all: $(TARGET) $(TEST_RNG_TARGET)
 
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
 $(TEST_RNG_TARGET): $(TEST_RNG_OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^
 
 check:
 	@echo "Running RNG implementation tests..."
-	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1
+	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1 || { echo "Failed to build RNG test program"; exit 1; }
 	@./$(TEST_RNG_TARGET) || { echo "RNG tests failed"; exit 1; }
 	@echo "RNG tests passed"
-
+	
 	@echo "Running randall functionality tests..."
-	@$(MAKE) $(TARGET) >/dev/null 2>&1	
-	@# Run basic functionality tests
-	@echo "Running basic functionality tests..."
+	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Failed to build randall"; exit 1; }
+	
 	@echo "Test 1: Checking if program compiles..."
 	@test -f $(TARGET) && echo "Test 1 passed: compilation" || { echo "Test 1 failed: compilation"; exit 1; }
 	
@@ -41,7 +43,6 @@ check:
 		exit 1; \
 	fi
 	
-	@# Continue with remaining tests 3-8...
 	@echo "Test 3: Generate 100 bytes..."
 	@OUTPUT=$$(./$(TARGET) 100 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "100" ]; then \
@@ -110,8 +111,8 @@ check:
 		rm -f test_input.txt; \
 		exit 1; \
 	fi
-	@rm -f test_input.txt rng_test_output.txt
-
+	@rm -f test_input.txt
+	@echo "All tests passed successfully"
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST_RNG_OBJECTS) $(TEST_RNG_TARGET) \
 	      rand.data *.tgz test_output.bin test_input.txt rng_test_output.txt

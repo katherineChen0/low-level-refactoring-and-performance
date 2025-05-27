@@ -5,6 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+void (*initialize)(void) = NULL;
+unsigned long long (*rand64)(void) = NULL;
+void (*finalize)(void) = NULL;
+
 /* Main program, which outputs N bytes of random data.  */
 int main(int argc, char **argv)
 {
