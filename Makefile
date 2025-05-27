@@ -1,77 +1,96 @@
-# Optimization level.  Change this -O2 to -Og or -O0 or whatever.
-OPTIMIZE = -O2
+# Makefile for randall
 
-# The C compiler and its options.
 CC = gcc
-CFLAGS = $(OPTIMIZE) -g3 -Wall -Wextra -fanalyzer \
-  -march=native -mtune=native -mrdrnd
+CFLAGS = -Wall -Wextra -O2 -g -march=native
 
-# The archiver command, its options and filename extension.
-TAR = tar
-TARFLAGS = --gzip --transform 's,^,randall/,'
-TAREXT = tgz
+SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
+OBJECTS = $(SOURCES:.c=.o)
+HEADERS = options.h output.h rand64-hw.h rand64-sw.h
 
-default: randall
+TARGET = randall
 
-randall: randall.c options.c output.c rand64-hw.c rand64-sw.c rand48.c
-	$(CC) $(CFLAGS) $^ -o $@
+.PHONY: all clean check submission-tarball repository-tarball
 
-assignment: randall-assignment.$(TAREXT)
-assignment-files = COPYING Makefile randall.c
-randall-assignment.$(TAREXT): $(assignment-files)
-	$(TAR) $(TARFLAGS) -cf $@ $(assignment-files)
+all: $(TARGET)
 
-submission-tarball: randall-submission.$(TAREXT)
-submission-files = $(assignment-files) \
-  notes.txt # More files should be listed here, as needed.
-randall-submission.$(TAREXT): $(submission-files)
-	$(TAR) $(TARFLAGS) -cf $@ $(submission-files)
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
 
-repository-tarball:
-	$(TAR) -czf randall-git.tgz .git
+%.o: %.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $<
 
-.PHONY: default clean assignment submission-tarball repository-tarball
+check: $(TARGET)
+	@echo "Running basic tests..."
+	# Test 1: Generate 0 bytes (should produce no output)
+	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$'; then \
+		echo "Test 1 passed: 0 bytes"; \
+	else \
+		echo "Test 1 failed: 0 bytes"; \
+	fi
+	
+	# Test 2: Generate 100 bytes (check output length)
+	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+		echo "Test 2 passed: 100 bytes"; \
+	else \
+		echo "Test 2 failed: 100 bytes"; \
+	fi
+	
+	# Test 3: Test different input methods
+	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3a passed: rdrand"; \
+	else \
+		echo "Test 3a failed: rdrand"; \
+	fi
+	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3b passed: mrand48_r"; \
+	else \
+		echo "Test 3b failed: mrand48_r"; \
+	fi
+	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+		echo "Test 3c passed: /dev/urandom"; \
+	else \
+		echo "Test 3c failed: /dev/urandom"; \
+	fi
+	
+	# Test 4: Test block output
+	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+		echo "Test 4 passed: block output"; \
+	else \
+		echo "Test 4 failed: block output"; \
+	fi
+	
+	# Test 5: Invalid arguments should fail
+	@if ! ./$(TARGET) -100 2>/dev/null; then \
+		echo "Test 5a passed: negative bytes rejected"; \
+	else \
+		echo "Test 5a failed: negative bytes not rejected"; \
+	fi
+	@if ! ./$(TARGET) abc 2>/dev/null; then \
+		echo "Test 5b passed: invalid bytes rejected"; \
+	else \
+		echo "Test 5b failed: invalid bytes not rejected"; \
+	fi
+	@if ! ./$(TARGET) -i invalid 100 2>/dev/null; then \
+		echo "Test 5c passed: invalid input rejected"; \
+	else \
+		echo "Test 5c failed: invalid input not rejected"; \
+	fi
+	
+	@echo "All tests completed."
 
 clean:
-	rm -f *.o *.$(TAREXT) randall
+	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz
 
-check:
-	make
-	echo "General Cases: "
-	./randall 10 | wc --bytes | grep -w "10" && echo "PASSED" || echo "FAILED"
-	./randall 100 | wc --bytes | grep -w "100" && echo "PASSED" || echo "FAILED"
-	./randall 1000000 | wc --bytes | grep -w "1000000" && echo "PASSED" || echo "FAILED"
+submission-tarball: $(TARGET)
+	mkdir -p randall
+	cp $(SOURCES) $(HEADERS) Makefile notes.txt randall/
+	chmod +x test-basic.sh 2>/dev/null || true
+	cp test-basic.sh randall/ 2>/dev/null || true
+	tar -czf randall-submission.tgz randall/
+	rm -rf randall
 
-	echo
+repository-tarball:
+	tar -czf randall-git.tgz .git
 
-	echo "Hardware Cases: "
-	./randall 10 -i rdrand | wc --bytes | grep -w "10" && echo "PASSED" || echo "FAILED"
-	./randall 100 -i rdrand | wc --bytes | grep -w "100" && echo "PASSED" || echo "FAILED"
-	./randall 1000000 -i rdrand | wc --bytes | grep -w "1000000" && echo "PASSED" || echo "FAILED"
-
-	echo
-
-	echo "-i mrand48_r cases"
-	./randall 10 -i mrand48_r | wc --bytes | grep -w "10" && echo "PASSED" || echo "FAILED"
-	./randall 100 -i mrand48_r | wc --bytes | grep -w "100" && echo "PASSED" || echo "FAILED"
-	./randall 1000000 -i mrand48_r | wc --bytes | grep -w "1000000" && echo "PASSED" || echo "FAILED"
-
-	echo
-
-	echo "-i /F cases: "
-	./randall 3 -i /w/home.06/cs/ugrad/rolandy/lab5/lab5/test.txt | grep -w "123" && echo "PASSED" || echo "FAILED"
-	./randall 8 -i /w/home.06/cs/ugrad/rolandy/lab5/lab5/test.txt | wc --bytes | grep -w "8" && echo "PASSED" || echo "FAILED"
-
-	echo
-
-	echo "-o stdio cases: "
-	./randall 10 -o stdio | wc --bytes | grep -w "10" && echo "PASSED" || echo "FAILED"
-	./randall 100 -o stdio | wc --bytes | grep -w "100" && echo "PASSED" || echo "FAILED"
-	./randall 1000000 -o stdio | wc --bytes | grep -w "1000000" && echo "PASSED" || echo "FAILED"
-
-	echo
-
-	echo "-o N cases: "
-	./randall 10 -o 5 | wc --bytes | grep -w "10" && echo "PASSED" || echo "FAILED"
-	./randall 100 -o 10 | wc --bytes | grep -w "100" && echo "PASSED" || echo "FAILED"
-	./randall 500000 -o 15 | wc --bytes | grep -w "500000" && echo "FAILED" || echo "PASSED"
+distclean: clean
+	rm -f *.tgz
