@@ -3,15 +3,16 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -g -march=native
 
+# Main program sources
 SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = options.h output.h rand64-hw.h rand64-sw.h
+TARGET = randall
 
+# RNG test program sources
 TEST_RNG_SOURCES = test_rng.c rand64-hw.c rand64-sw.c
 TEST_RNG_OBJECTS = $(TEST_RNG_SOURCES:.c=.o)
 TEST_RNG_TARGET = test-rng
-
-TARGET = randall
 
 .PHONY: all clean check submission-tarball repository-tarball distclean
 
@@ -25,9 +26,10 @@ $(TEST_RNG_TARGET): $(TEST_RNG_OBJECTS)
 
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $<
-	
-check: $(TEST_RNG_TARGET)
+
+check:
 	@echo "Running RNG validation tests..."
+	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1
 	@./$(TEST_RNG_TARGET) > rng_test_output.txt
 	@if grep -q "RNG passed" rng_test_output.txt; then \
 		echo "RNG tests passed"; \
@@ -37,13 +39,12 @@ check: $(TEST_RNG_TARGET)
 		exit 1; \
 	fi
 
-	@echo "Running basic tests..."
-	# Test 1: Check compilation
+	@echo "Running basic functionality tests..."
+	@$(MAKE) $(TARGET) >/dev/null 2>&1
+	@# Test 1: Check compilation
 	@echo "Test 1: Checking if program compiles..."
-	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Test 1 failed: compilation"; exit 1; }
-	@echo "Test 1 passed: compilation"
+	@test -f $(TARGET) && echo "Test 1 passed: compilation" || { echo "Test 1 failed: compilation"; exit 1; }
 	
-	# Test 2: Generate 0 bytes (should produce no output)
 	@echo "Test 2: Generate 0 bytes..."
 	@OUTPUT=$$(./$(TARGET) 0 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "0" ]; then \
@@ -125,28 +126,18 @@ check: $(TEST_RNG_TARGET)
 		rm -f test_input.txt; \
 		exit 1; \
 	fi
-	@rm -f test_input.txt
+	@rm -f rng_test_output.txt test_input.txt
 
-	@echo "Running RNG validation tests..."
-	@./$(TEST_TARGET) > rng_test_output.txt
-	@if grep -q "Changed values: 100/100" rng_test_output.txt; then \
-		echo "RNG test passed: Good randomness detected"; \
-	else \
-		echo "RNG test warning: Some RNGs may not be sufficiently random"; \
-		cat rng_test_output.txt; \
-	fi
-	@rm -f rng_test_output.txt		
+clean:
+	rm -f $(OBJECTS) $(TARGET) $(TEST_RNG_OBJECTS) $(TEST_RNG_TARGET) \
+	      rand.data *.tgz test_output.bin test_input.txt rng_test_output.txt
 
-submission-tarball: $(TARGET) $(TEST_TARGET)
+submission-tarball: $(TARGET) $(TEST_RNG_TARGET)
 	rm -rf randall
 	mkdir -p randall
-	# Copy main program sources and headers
-	cp $(SOURCES) $(HEADERS) Makefile notes.txt randall/
-	# Copy test files
-	cp test_rng.c test-basic.sh randall/ 2>/dev/null || true
-	# Ensure permissions
+	cp $(SOURCES) $(HEADERS) test_rng.c Makefile notes.txt randall/
 	chmod +x test-basic.sh 2>/dev/null || true
-	# Create the tarball
+	cp test-basic.sh randall/ 2>/dev/null || true
 	tar -czf randall-submission.tgz randall/
 	rm -rf randall
 
