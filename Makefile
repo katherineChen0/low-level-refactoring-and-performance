@@ -130,15 +130,19 @@ check: $(TARGET) $(TEST_TARGET)
 	fi
 	@rm -f rng_test_output.txt		
 
-submission-tarball: $(TARGET)
+submission-tarball: $(TARGET) $(TEST_TARGET)
 	rm -rf randall
 	mkdir -p randall
+	# Copy main program sources and headers
 	cp $(SOURCES) $(HEADERS) Makefile notes.txt randall/
+	# Copy test files
+	cp test_rng.c test-basic.sh randall/ 2>/dev/null || true
+	# Ensure permissions
 	chmod +x test-basic.sh 2>/dev/null || true
-	cp test-basic.sh randall/ 2>/dev/null || true
+	# Create the tarball
 	tar -czf randall-submission.tgz randall/
 	rm -rf randall
-
+	
 repository-tarball:
 	tar -czf randall-git.tgz .git
 
