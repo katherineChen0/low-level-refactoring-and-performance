@@ -22,41 +22,47 @@ $(TARGET): $(OBJECTS)
 check: $(TARGET)
 	@echo "Running basic tests..."
 	# Test 1: Generate 0 bytes (should produce no output)
-	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$$'; then \
+	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$'; then \
 		echo "Test 1 passed: 0 bytes"; \
 	else \
 		echo "Test 1 failed: 0 bytes"; \
+		exit 1; \
 	fi
 	
 	# Test 2: Generate 100 bytes (check output length)
-	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$$'; then \
+	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$'; then \
 		echo "Test 2 passed: 100 bytes"; \
 	else \
 		echo "Test 2 failed: 100 bytes"; \
+		exit 1; \
 	fi
 	
 	# Test 3: Test different input methods
-	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
+	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$'; then \
 		echo "Test 3a passed: rdrand"; \
 	else \
 		echo "Test 3a failed: rdrand"; \
+		exit 1; \
 	fi
-	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
+	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$'; then \
 		echo "Test 3b passed: mrand48_r"; \
 	else \
 		echo "Test 3b failed: mrand48_r"; \
+		exit 1; \
 	fi
-	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
+	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$'; then \
 		echo "Test 3c passed: /dev/urandom"; \
 	else \
 		echo "Test 3c failed: /dev/urandom"; \
+		exit 1; \
 	fi
 	
 	# Test 4: Test block output
-	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$$'; then \
+	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$'; then \
 		echo "Test 4 passed: block output"; \
 	else \
 		echo "Test 4 failed: block output"; \
+		exit 1; \
 	fi
 	
 	# Test 5: Invalid arguments should fail
@@ -64,22 +70,53 @@ check: $(TARGET)
 		echo "Test 5a passed: negative bytes rejected"; \
 	else \
 		echo "Test 5a failed: negative bytes not rejected"; \
+		exit 1; \
 	fi
 	@if ! ./$(TARGET) abc 2>/dev/null; then \
 		echo "Test 5b passed: invalid bytes rejected"; \
 	else \
 		echo "Test 5b failed: invalid bytes not rejected"; \
+		exit 1; \
 	fi
 	@if ! ./$(TARGET) -i invalid 100 2>/dev/null; then \
 		echo "Test 5c passed: invalid input rejected"; \
 	else \
 		echo "Test 5c failed: invalid input not rejected"; \
+		exit 1; \
 	fi
 	
-	@echo "All tests completed."
+	# Test 6: Test randomness quality (basic entropy check)
+	@echo "Test 6: Basic randomness check..."
+	@./$(TARGET) -i mrand48_r 1000 2>/dev/null > test_output.bin || true
+	@if [ -s test_output.bin ]; then \
+		if od -An -tx1 test_output.bin | tr -d ' \n' | grep -E '(00){10,}|(ff){10,}' >/dev/null; then \
+			echo "Test 6 failed: output appears non-random"; \
+			rm -f test_output.bin; \
+			exit 1; \
+		else \
+			echo "Test 6 passed: basic randomness check"; \
+		fi; \
+	else \
+		echo "Test 6 failed: no output generated"; \
+		exit 1; \
+	fi
+	@rm -f test_output.bin
+	
+	# Test 7: Test file input with actual file
+	@echo "hello world" > test_input.txt
+	@if ./$(TARGET) -i test_input.txt 5 2>/dev/null | wc -c | grep -q '^5$'; then \
+		echo "Test 7 passed: file input"; \
+	else \
+		echo "Test 7 failed: file input"; \
+		rm -f test_input.txt; \
+		exit 1; \
+	fi
+	@rm -f test_input.txt
+	
+	@echo "All tests completed successfully."
 
 clean:
-	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz
+	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz test_output.bin test_input.txt
 
 submission-tarball: $(TARGET)
 	rm -rf randall
