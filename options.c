@@ -63,7 +63,7 @@ int process_options(int argc, char **argv, long long* nbytes, int* inputChoice, 
         else if (strcmp(inputArg, "mrand48_r") == 0) {
             *inputChoice = 1;
         }
-        else if (inputArg[0] == '/') {
+        else if (inputArg[0] == '/' || strcmp(inputArg, "rdrand") != 0 && strcmp(inputArg, "mrand48_r") != 0) {
             FILE *file = fopen(inputArg, "r");
             if (file == NULL) {
                 fprintf(stderr, "Failed to open file: %s\n", inputArg);
@@ -71,7 +71,7 @@ int process_options(int argc, char **argv, long long* nbytes, int* inputChoice, 
             }
             setFilename(inputArg);
             fclose(file);
-            *inputChoice = 2;
+              *inputChoice = 2;
         }
         else {
             fprintf(stderr, "Invalid input argument for -i: %s\n", inputArg);

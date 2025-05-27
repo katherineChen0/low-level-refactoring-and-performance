@@ -33,22 +33,21 @@ void software_rand64_init(void)
 
 void setFilename(char *newfile)
 {
-    filename = newfile;
-    use_mrand48 = 0;
-    
     // Close existing stream if open
     if (urandstream) {
         fclose(urandstream);
         urandstream = NULL;
     }
     
-    // Try to open the new file immediately to verify it's readable
-    FILE *test = fopen(filename, "r");
-    if (!test) {
+    filename = newfile;
+    use_mrand48 = 0;
+    
+    // Open the file immediately to verify it's readable
+    urandstream = fopen(filename, "r");
+    if (!urandstream) {
         fprintf(stderr, "Error: cannot open file %s\n", filename);
-        return;
+        abort();
     }
-    fclose(test);
 }
 
 /* Return a random value, using software operations.  */
@@ -75,16 +74,8 @@ software_rand64(void)
         result ^= result >> 32;
         
         return result;
-    } else {
+} else {
         unsigned long long int x;
-        // Reopen the stream if it's not open
-        if (!urandstream) {
-            urandstream = fopen(filename, "r");
-            if (!urandstream) {
-                fprintf(stderr, "Error reopening file %s\n", filename);
-                abort();
-            }
-        }
         if (fread(&x, sizeof x, 1, urandstream) != 1) {
             // If we hit EOF, rewind and try again
             rewind(urandstream);
