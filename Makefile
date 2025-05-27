@@ -3,13 +3,11 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -g -march=native
 
-# Main program sources
 SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = options.h output.h rand64-hw.h rand64-sw.h
 TARGET = randall
 
-# RNG test program sources
 TEST_RNG_SOURCES = test_rng.c rand64-hw.c rand64-sw.c
 TEST_RNG_OBJECTS = $(TEST_RNG_SOURCES:.c=.o)
 TEST_RNG_TARGET = test-rng
@@ -28,9 +26,13 @@ $(TEST_RNG_TARGET): $(TEST_RNG_OBJECTS)
 	$(CC) $(CFLAGS) -c $<
 
 check:
+	@# Build the test-rng program first
+	@echo "Building RNG test program..."
+	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1 || { echo "Failed to build RNG test program"; exit 1; }
+	
+	@# Run RNG validation tests
 	@echo "Running RNG validation tests..."
-	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1
-	@./$(TEST_RNG_TARGET) > rng_test_output.txt
+	@./$(TEST_RNG_TARGET) > rng_test_output.txt || { echo "RNG tests failed to execute"; exit 1; }
 	@if grep -q "RNG passed" rng_test_output.txt; then \
 		echo "RNG tests passed"; \
 	else \
@@ -38,10 +40,13 @@ check:
 		cat rng_test_output.txt; \
 		exit 1; \
 	fi
-
+	
+	@# Build the main program
+	@echo "Building main program..."
+	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Failed to build main program"; exit 1; }
+	
+	@# Run basic functionality tests
 	@echo "Running basic functionality tests..."
-	@$(MAKE) $(TARGET) >/dev/null 2>&1
-	@# Test 1: Check compilation
 	@echo "Test 1: Checking if program compiles..."
 	@test -f $(TARGET) && echo "Test 1 passed: compilation" || { echo "Test 1 failed: compilation"; exit 1; }
 	
@@ -54,7 +59,7 @@ check:
 		exit 1; \
 	fi
 	
-	# Test 3: Generate 100 bytes (check output length)
+	@# Continue with remaining tests 3-8...
 	@echo "Test 3: Generate 100 bytes..."
 	@OUTPUT=$$(./$(TARGET) 100 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "100" ]; then \
@@ -64,7 +69,6 @@ check:
 		exit 1; \
 	fi
 	
-	# Test 4: Basic mrand48_r functionality test
 	@echo "Test 4: Basic mrand48_r functionality..."
 	@OUTPUT=$$(./$(TARGET) -i mrand48_r 16 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "16" ]; then \
@@ -74,7 +78,6 @@ check:
 		exit 1; \
 	fi
 	
-	# Test 5: Test /dev/urandom input method
 	@echo "Test 5: Test /dev/urandom input..."
 	@OUTPUT=$$(./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "50" ]; then \
@@ -84,7 +87,6 @@ check:
 		exit 1; \
 	fi
 	
-	# Test 6: Test block output
 	@echo "Test 6: Test block output..."
 	@OUTPUT=$$(./$(TARGET) -o 1024 100 2>/dev/null | wc -c); \
 	if [ "$$OUTPUT" = "100" ]; then \
@@ -94,14 +96,14 @@ check:
 		exit 1; \
 	fi
 	
-	# Test 7: Invalid arguments should fail
-	@echo "Test 7: Test error handling..."
+	@echo "Test 7: Invalid arguments should fail..."
 	@if ./$(TARGET) -100 >/dev/null 2>&1; then \
 		echo "Test 7a failed: negative bytes not rejected"; \
 		exit 1; \
 	else \
 		echo "Test 7a passed: negative bytes rejected"; \
 	fi
+	
 	@if ./$(TARGET) abc >/dev/null 2>&1; then \
 		echo "Test 7b failed: invalid bytes not rejected"; \
 		exit 1; \
@@ -122,11 +124,11 @@ check:
 		echo "File size:"; \
 		wc -c test_input.txt; \
 		echo "Trying to read 10 bytes:"; \
-		./$(TARGET) -i ./test_input.txt 10 2>/dev/null | head -c 10 | hexdump -C || true; \
+		./$(TARGET) -i ./test_input.txt 10 2>/dev/null | head -c 10 | cat -A || true; \
 		rm -f test_input.txt; \
 		exit 1; \
 	fi
-	@rm -f rng_test_output.txt test_input.txt
+	@rm -f test_input.txt rng_test_output.txt
 
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST_RNG_OBJECTS) $(TEST_RNG_TARGET) \
