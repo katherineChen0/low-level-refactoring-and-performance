@@ -3,33 +3,40 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -g -march=native
 
-TEST_SOURCES = test_rng.c options.c output.c rand64-hw.c rand64-sw.c
-TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
-TEST_TARGET = test-rng
-
-$(TEST_TARGET): $(TEST_OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $^
-
-test_rng.o: test_rng.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $<
-
 SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = options.h output.h rand64-hw.h rand64-sw.h
 
+TEST_RNG_SOURCES = test_rng.c rand64-hw.c rand64-sw.c
+TEST_RNG_OBJECTS = $(TEST_RNG_SOURCES:.c=.o)
+TEST_RNG_TARGET = test-rng
+
 TARGET = randall
 
-.PHONY: all clean check submission-tarball repository-tarball
+.PHONY: all clean check submission-tarball repository-tarball distclean
 
-all: $(TARGET)
+all: $(TARGET) $(TEST_RNG_TARGET)
 
 $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $^
 
+$(TEST_RNG_TARGET): $(TEST_RNG_OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $<
+	
+check: $(TEST_RNG_TARGET)
+	@echo "Running RNG validation tests..."
+	@./$(TEST_RNG_TARGET) > rng_test_output.txt
+	@if grep -q "RNG passed" rng_test_output.txt; then \
+		echo "RNG tests passed"; \
+	else \
+		echo "RNG tests failed"; \
+		cat rng_test_output.txt; \
+		exit 1; \
+	fi
 
-check: $(TARGET) $(TEST_TARGET)
 	@echo "Running basic tests..."
 	# Test 1: Check compilation
 	@echo "Test 1: Checking if program compiles..."
@@ -142,7 +149,7 @@ submission-tarball: $(TARGET) $(TEST_TARGET)
 	# Create the tarball
 	tar -czf randall-submission.tgz randall/
 	rm -rf randall
-	
+
 repository-tarball:
 	tar -czf randall-git.tgz .git
 
