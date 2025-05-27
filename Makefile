@@ -3,6 +3,16 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -O2 -g -march=native
 
+TEST_SOURCES = test_rng.c options.c output.c rand64-hw.c rand64-sw.c
+TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
+TEST_TARGET = test-rng
+
+$(TEST_TARGET): $(TEST_OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^
+
+test_rng.o: test_rng.c $(HEADERS)
+	$(CC) $(CFLAGS) -c $<
+
 SOURCES = randall.c options.c output.c rand64-hw.c rand64-sw.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = options.h output.h rand64-hw.h rand64-sw.h
@@ -19,7 +29,7 @@ $(TARGET): $(OBJECTS)
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $<
 
-check:
+check: $(TARGET) $(TEST_TARGET)
 	@echo "Running basic tests..."
 	# Test 1: Check compilation
 	@echo "Test 1: Checking if program compiles..."
@@ -108,8 +118,18 @@ check:
 		rm -f test_input.txt; \
 		exit 1; \
 	fi
-	@rm -f test_input.txt		
-	
+	@rm -f test_input.txt
+
+	@echo "Running RNG validation tests..."
+	@./$(TEST_TARGET) > rng_test_output.txt
+	@if grep -q "Changed values: 100/100" rng_test_output.txt; then \
+		echo "RNG test passed: Good randomness detected"; \
+	else \
+		echo "RNG test warning: Some RNGs may not be sufficiently random"; \
+		cat rng_test_output.txt; \
+	fi
+	@rm -f rng_test_output.txt		
+
 submission-tarball: $(TARGET)
 	rm -rf randall
 	mkdir -p randall
