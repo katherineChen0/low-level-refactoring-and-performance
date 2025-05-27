@@ -22,38 +22,38 @@ $(TARGET): $(OBJECTS)
 check: $(TARGET)
 	@echo "Running basic tests..."
 	# Test 1: Generate 0 bytes (should produce no output)
-	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$'; then \
+	@if ./$(TARGET) 0 2>/dev/null | wc -c | grep -q '^0$$'; then \
 		echo "Test 1 passed: 0 bytes"; \
 	else \
 		echo "Test 1 failed: 0 bytes"; \
 	fi
 	
 	# Test 2: Generate 100 bytes (check output length)
-	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+	@if ./$(TARGET) 100 2>/dev/null | wc -c | grep -q '^100$$'; then \
 		echo "Test 2 passed: 100 bytes"; \
 	else \
 		echo "Test 2 failed: 100 bytes"; \
 	fi
 	
 	# Test 3: Test different input methods
-	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+	@if ./$(TARGET) -i rdrand 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
 		echo "Test 3a passed: rdrand"; \
 	else \
 		echo "Test 3a failed: rdrand"; \
 	fi
-	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+	@if ./$(TARGET) -i mrand48_r 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
 		echo "Test 3b passed: mrand48_r"; \
 	else \
 		echo "Test 3b failed: mrand48_r"; \
 	fi
-	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$'; then \
+	@if ./$(TARGET) -i /dev/urandom 50 2>/dev/null | wc -c | grep -q '^50$$'; then \
 		echo "Test 3c passed: /dev/urandom"; \
 	else \
 		echo "Test 3c failed: /dev/urandom"; \
 	fi
 	
 	# Test 4: Test block output
-	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$'; then \
+	@if ./$(TARGET) -o 1024 100 2>/dev/null | wc -c | grep -q '^100$$'; then \
 		echo "Test 4 passed: block output"; \
 	else \
 		echo "Test 4 failed: block output"; \
@@ -82,6 +82,7 @@ clean:
 	rm -f $(OBJECTS) $(TARGET) rand.data *.tgz
 
 submission-tarball: $(TARGET)
+	rm -rf randall
 	mkdir -p randall
 	cp $(SOURCES) $(HEADERS) Makefile notes.txt randall/
 	chmod +x test-basic.sh 2>/dev/null || true
