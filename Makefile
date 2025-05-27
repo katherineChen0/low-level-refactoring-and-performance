@@ -12,7 +12,7 @@ TEST_RNG_SOURCES = test_rng.c rand64-hw.c rand64-sw.c
 TEST_RNG_OBJECTS = $(TEST_RNG_SOURCES:.c=.o)
 TEST_RNG_TARGET = test-rng
 
-.PHONY: all clean check submission-tarball repository-tarball distclean
+.PHONY: all clean check check-randall submission-tarball repository-tarball distclean
 
 all: $(TARGET) $(TEST_RNG_TARGET)
 
@@ -26,10 +26,10 @@ check:
 	@echo "Running RNG implementation tests..."
 	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1 || { echo "Failed to build RNG test program"; exit 1; }
 	@./$(TEST_RNG_TARGET) || { echo "RNG tests failed"; exit 1; }
-	@echo "RNG tests passed"
-	
+	@echo "All RNG tests passed successfully"
+
+check-randall: $(TARGET)
 	@echo "Running randall functionality tests..."
-	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Failed to build randall"; exit 1; }
 	
 	@echo "Test 1: Checking if program compiles..."
 	@test -f $(TARGET) && echo "Test 1 passed: compilation" || { echo "Test 1 failed: compilation"; exit 1; }
@@ -112,7 +112,8 @@ check:
 		exit 1; \
 	fi
 	@rm -f test_input.txt
-	@echo "All tests passed successfully"
+	@echo "All randall tests passed successfully"
+
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST_RNG_OBJECTS) $(TEST_RNG_TARGET) \
 	      rand.data *.tgz test_output.bin test_input.txt rng_test_output.txt
