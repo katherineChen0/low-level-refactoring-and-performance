@@ -1,22 +1,18 @@
-#ifndef RAND64_SW_H
-#define RAND64_SW_H
+#ifndef rand64_sw_h
+#define rand64_sw_h
 
-/* Initialize software random number generator */
-int software_rand64_init(void);
+#include <stdio.h>
 
-/* Generate a random 64-bit value using mrand48_r */
-unsigned long long software_rand64(void);
+void
+software_rand64_init(void);
 
-/* Finalize software random number generator */
-void software_rand64_fini(void);
+unsigned long long
+software_rand64(void);
 
-/* Initialize file-based random number generator */
-int file_rand64_init(const char *filename);
+void
+software_rand64_fini(void);
 
-/* Generate a random 64-bit value from file */
-unsigned long long file_rand64(void);
+void
+setFilename (char* newfile);
 
-/* Finalize file-based random number generator */
-void file_rand64_fini(void);
-
-#endif
+#endif /* rand64_sw_h */

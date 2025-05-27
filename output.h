@@ -1,15 +1,10 @@
-#ifndef OUTPUT_H
-#define OUTPUT_H
+#ifndef output_h
+#define output_h
 
-#include "options.h"
+#include <limits.h>
+#include <stdbool.h>
 
-/* Initialize output subsystem */
-int init_output(struct randall_options *opts);
+bool
+writebytes(unsigned long long x, int nbytes);
 
-/* Write bytes to output */
-int write_bytes(const char *buf, int nbytes);
-
-/* Finalize output subsystem */
-void finalize_output(void);
-
-#endif
+#endif /* rand64_hw_h */

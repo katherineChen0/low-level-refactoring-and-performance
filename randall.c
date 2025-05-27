@@ -1,86 +1,102 @@
-/* Generate random bytes. */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
+
 #include "options.h"
 #include "output.h"
 #include "rand64-hw.h"
 #include "rand64-sw.h"
 
-int main(int argc, char **argv)
+/* Main program, which outputs N bytes of random data.  */
+int
+main (int argc, char **argv)
 {
-    /* Parse options */
-    struct randall_options opts;
-    if (parse_options(argc, argv, &opts) != 0) {
-        return 1;
-    }
+  /* Check arguments.  */
+  // bool valid = false;
+  long long nbytes;
+  long long chunksize;
+  int inputChoice = 0; // 0 (default) = rdrand, 1 = mrand48_r, 2 = /F
+  int outputChoice = 0; // 0 (default) = stdio, 1 = N
 
-    /* Check for valid nbytes */
-    if (opts.nbytes < 0) {
-        fprintf(stderr, "randall: invalid number of bytes: %lld\n", opts.nbytes);
-        return 1;
-    }
+  // Process the options
+  if (process_options(argc, argv, &nbytes, &inputChoice, &outputChoice, &chunksize)) {
+    // perror("PROCESS OPTIONS FAILED\n");
+    return 1;
+  }
 
-    /* Initialize random number generator */
-    void (*finalize_rand)(void) = NULL;
-    unsigned long long (*rand64)(void) = NULL;
-
-    switch (opts.input) {
-        case INPUT_RDRAND:
-            if (!rdrand_supported()) {
-                fprintf(stderr, "randall: rdrand not supported\n");
-                return 1;
-            }
-            rand64 = hardware_rand64;
-            finalize_rand = hardware_rand64_fini;
-            break;
-        case INPUT_MRAND48_R:
-            if (software_rand64_init() != 0) {
-                fprintf(stderr, "randall: failed to initialize mrand48_r\n");
-                return 1;
-            }
-            rand64 = software_rand64;
-            finalize_rand = software_rand64_fini;
-            break;
-        case INPUT_FILE:
-            if (file_rand64_init(opts.input_file) != 0) {
-                fprintf(stderr, "randall: failed to open input file: %s\n", opts.input_file);
-                return 1;
-            }
-            rand64 = file_rand64;
-            finalize_rand = file_rand64_fini;
-            break;
-    }
-
-    /* Initialize output */
-    if (init_output(&opts) != 0) {
-        if (finalize_rand) finalize_rand();
-        return 1;
-    }
-
-    /* Generate and output random bytes */
-    long long bytes_written = 0;
-    while (bytes_written < opts.nbytes) {
-        unsigned long long x = rand64();
-        int outbytes = opts.nbytes - bytes_written;
-        if (outbytes > sizeof(x))
-            outbytes = sizeof(x);
-
-        if (write_bytes((char *)&x, outbytes) != outbytes) {
-            fprintf(stderr, "randall: output error\n");
-            if (finalize_rand) finalize_rand();
-            finalize_output();
-            return 1;
-        }
-        bytes_written += outbytes;
-    }
-
-    /* Clean up */
-    if (finalize_rand) finalize_rand();
-    finalize_output();
-
+  /* If there's no work to do, don't worry about which library to use.  */
+  if (nbytes == 0)
     return 0;
+
+  /* Now that we know we have work to do, arrange to use the
+     appropriate library.  */
+  void (*initialize) (void);
+  unsigned long long (*rand64) (void);
+  void (*finalize) (void);
+
+  if (inputChoice == 0) { // rdrand
+    if (rdrand_supported()) {
+      initialize = hardware_rand64_init;
+      rand64 = hardware_rand64;
+      finalize = hardware_rand64_fini;
+    } else {
+      fprintf(stderr, "rdrand hardware random number generator currently not available!\n");
+      return 1;
+    }
+  }
+  else if (inputChoice == 1) { // mrand_48
+    initialize = software_rand48_init;
+    rand64 = software_rand48;
+    finalize = software_rand48_fini;
+    // printf("mrand48 set\n");
+  }
+  else if (inputChoice == 2) { // file
+    initialize = software_rand64_init;
+    rand64 = software_rand64;
+    finalize = software_rand64_fini;
+  }
+
+  initialize ();
+  int wordsize = sizeof rand64 ();
+
+  if (outputChoice == 0) {
+     do {
+        unsigned long long x = rand64 ();
+        int outbytes = nbytes < wordsize ? nbytes : wordsize;
+        if (!writebytes (x, outbytes)) {
+          fprintf(stderr, "Output error!");
+          return 1;
+        }
+        nbytes -= outbytes;
+    }
+    while (0 < nbytes);
+
+    if (fclose (stdout) != 0) {
+      fprintf(stderr, "Output error!");
+      return 1;
+    }
+  } else if (outputChoice == 1) {
+    // printf("VALUE: %d", chunksize);
+
+    int offset = 0;
+    unsigned long long x;
+
+    // write in chunks of chunksize at a time
+    while (nbytes > 0) {
+        size_t outbytes = (nbytes >= chunksize) ? chunksize : nbytes;                                                         
+        x = rand64 ();
+
+        memcpy(stdout, (const char*)&x + offset, outbytes);
+                                                                                              
+        if (write(1, stdout, outbytes) < 0) {
+          fprintf(stderr, "Output error!");
+          return 1;
+        }
+                                                                                     
+        offset += outbytes;
+        nbytes -= outbytes;
+    }
+
+  }
+
+  finalize ();
+  return 0;
 }

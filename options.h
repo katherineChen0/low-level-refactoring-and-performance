@@ -1,26 +1,11 @@
-#ifndef OPTIONS_H
-#define OPTIONS_H
+#ifndef options_h
+#define options_h
 
-enum input_type {
-    INPUT_RDRAND,
-    INPUT_MRAND48_R,
-    INPUT_FILE
-};
+#include <errno.h>
+#include <stdio.h>
+#include <getopt.h>
+#include <string.h>
 
-enum output_type {
-    OUTPUT_STDIO,
-    OUTPUT_BLOCK
-};
+int process_options(int argc, char **argv, long long* nbytes, int* inputChoice, int* outputChoice, long long* chunksize);
 
-struct randall_options {
-    long long nbytes;
-    enum input_type input;
-    char *input_file;
-    enum output_type output;
-    int block_size;
-};
-
-/* Parse command line options and return 0 on success, -1 on error */
-int parse_options(int argc, char **argv, struct randall_options *opts);
-
-#endif
+#endif /* rand64_hw_h */
