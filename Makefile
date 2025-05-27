@@ -12,7 +12,7 @@ TEST_RNG_SOURCES = test_rng.c rand64-hw.c rand64-sw.c
 TEST_RNG_OBJECTS = $(TEST_RNG_SOURCES:.c=.o)
 TEST_RNG_TARGET = test-rng
 
-.PHONY: all clean check check-randall submission-tarball repository-tarball distclean
+.PHONY: all clean check submission-tarball repository-tarball distclean
 
 all: $(TARGET) $(TEST_RNG_TARGET)
 
@@ -26,10 +26,10 @@ check:
 	@echo "Running RNG implementation tests..."
 	@$(MAKE) $(TEST_RNG_TARGET) >/dev/null 2>&1 || { echo "Failed to build RNG test program"; exit 1; }
 	@./$(TEST_RNG_TARGET) || { echo "RNG tests failed"; exit 1; }
-	@echo "All RNG tests passed successfully"
-
-check-randall: $(TARGET)
+	@echo "RNG tests passed"
+	
 	@echo "Running randall functionality tests..."
+	@$(MAKE) $(TARGET) >/dev/null 2>&1 || { echo "Failed to build randall"; exit 1; }
 	
 	@echo "Test 1: Checking if program compiles..."
 	@test -f $(TARGET) && echo "Test 1 passed: compilation" || { echo "Test 1 failed: compilation"; exit 1; }
@@ -80,18 +80,26 @@ check-randall: $(TARGET)
 	fi
 	
 	@echo "Test 7: Invalid arguments should fail..."
-	@if ./$(TARGET) -100 >/dev/null 2>&1; then \
+	@if timeout 5 ./$(TARGET) -100 >/dev/null 2>&1; then \
 		echo "Test 7a failed: negative bytes not rejected"; \
 		exit 1; \
 	else \
 		echo "Test 7a passed: negative bytes rejected"; \
 	fi
 	
-	@if ./$(TARGET) abc >/dev/null 2>&1; then \
+	@if timeout 5 ./$(TARGET) abc >/dev/null 2>&1; then \
 		echo "Test 7b failed: invalid bytes not rejected"; \
 		exit 1; \
 	else \
 		echo "Test 7b passed: invalid bytes rejected"; \
+	fi
+	
+	@echo "Test 7c: Non-existent input file should fail..."
+	@if timeout 5 ./$(TARGET) -i input_non_existent 10 >/dev/null 2>&1; then \
+		echo "Test 7c failed: non-existent file not rejected"; \
+		exit 1; \
+	else \
+		echo "Test 7c passed: non-existent file rejected"; \
 	fi
 	
 	@echo "Test 8: Test file input..."
@@ -112,7 +120,7 @@ check-randall: $(TARGET)
 		exit 1; \
 	fi
 	@rm -f test_input.txt
-	@echo "All randall tests passed successfully"
+	@echo "All tests passed successfully"
 
 clean:
 	rm -f $(OBJECTS) $(TARGET) $(TEST_RNG_OBJECTS) $(TEST_RNG_TARGET) \
