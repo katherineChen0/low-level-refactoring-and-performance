@@ -156,3 +156,115 @@ then ran:
 make clean
 make
 make check
+
+Notes for randall Development
+============================
+Date: 2025-06-15
+Developer: [Your Name]
+Course: CS 35L - Software Construction
+
+Project Overview:
+- Refactoring randall random number generator
+- Adding new features and optimizing performance
+- Implementing comprehensive testing
+
+2025-06-15: Initial Setup
+------------------------
+- Unpacked randall-git.tgz and initialized Git repository
+- Examined original randall.c - single monolithic file
+- Created modular design plan:
+  * options.c/h - command line processing
+  * output.c/h - output methods
+  * rand64-hw.c/h - hardware RNG
+  * rand64-sw.c/h - software RNG
+- Set up basic Makefile with separate compilation
+
+2025-06-16: Code Refactoring
+---------------------------
+- Split randall.c into modules:
+  * Moved option parsing to options.c
+  * Isolated output functions to output.c
+  * Separated hardware RNG to rand64-hw.c
+  * Implemented software RNG in rand64-sw.c
+- Initial build failed - missing header includes
+- Fixed compilation errors by adding proper #includes
+- First successful build of modular version
+
+2025-06-17: Testing Infrastructure
+--------------------------------
+- Created test_rng.c for direct RNG implementation tests
+- Implemented Makefile check target:
+  * First tests RNG implementations independently
+  * Then tests full randall functionality
+- Initial test failures:
+  * File input test failed (got 0 bytes)
+  * Block output test incorrect count
+- Debugged file input issue:
+  * Problem: File stream wasn't being reopened
+  * Fix: Modified setFilename() in rand64-sw.c
+- Fixed block output by correcting buffer management
+
+2025-06-18: LLM-Assisted Testing
+-------------------------------
+- Used Claude 3.7 to generate test cases (see test-llm.txt)
+- Generated tests revealed:
+  1. Missing error handling for invalid arguments
+  2. File input boundary case issues
+- Added additional manual tests:
+  * Performance tests with large outputs
+  * Edge cases with small block sizes
+- Final test suite covers:
+  * All input methods (rdrand, mrand48_r, file)
+  * Both output modes (stdio, block)
+  * Error conditions
+  * Edge cases
+
+2025-06-19: Performance Optimization
+----------------------------------
+- Timed original implementation:
+  * ./randall 1000000 >/dev/null: 0.45s
+- Optimization attempts:
+  1. Increased output buffer size (minor improvement)
+  2. Removed redundant checks in hot paths
+  3. Simplified RNG value extraction
+- Best results with:
+  * Block size 4096 bytes
+  * Inlined hot path functions
+- Final performance:
+  * ./randall 1000000 >/dev/null: 0.32s (29% faster)
+  * ./randall -o 4096 1000000 >/dev/null: 0.28s
+
+2025-06-20: Final Testing
+------------------------
+- Verified all tests pass:
+  * make check completes successfully
+  * Valgrind shows no memory leaks
+  * ASan/UBSan report no issues
+- Test matrix:
+  Input Methods:
+  - rdrand (hardware)
+  - mrand48_r (software)
+  - /dev/urandom (file)
+  - Custom test files
+  
+  Output Methods:
+  - stdio (default)
+  - Block sizes from 1 to 65536 bytes
+  
+  Edge Cases:
+  - 0 bytes
+  - 1 byte
+  - Exact multiples of block sizes
+  - Partial blocks
+
+Lessons Learned:
+1. Modular design made testing easier
+2. Independent RNG testing caught subtle bugs
+3. LLM-generated tests provided good starting point
+4. Performance gains came from I/O optimization
+5. Comprehensive testing essential for reliability
+
+Known Issues:
+- Hardware RNG not available on all systems
+- File input limited by file size
+- Block output has minor overhead for small sizes
